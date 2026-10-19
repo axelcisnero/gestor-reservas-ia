@@ -7,11 +7,13 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.http import JsonResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
+from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
 from django.utils.dateformat import format as date_format
 from django.utils.dateparse import parse_datetime
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
-from .models import Resource, Booking, Availability
+from .models import Resource, Booking, Availability, PaymentProfile
+from .pagos import perfil_vigente
 from .services import ReservaError, crear_reservas
 
 
@@ -117,10 +119,13 @@ def calendario_full(request, resource_id):
         'reservas_json': json.dumps(reservas_json),
         'bloqueos_json': json.dumps(bloqueos_json),
         'is_authenticated': request.user.is_authenticated,
+        'precio_hora': resource.price_per_hour,
+        'perfil_pago': perfil_vigente(request.user) if request.user.is_authenticated else None,
     })
 
 
 
+@sensitive_variables('data')
 @require_POST
 def api_crear_reserva(request):
     """
@@ -139,12 +144,14 @@ def api_crear_reserva(request):
     except (ValueError, TypeError):
         return JsonResponse({'success': False, 'error': 'Datos de la reserva inválidos.'}, status=400)
     try:
-        reservas = crear_reservas(request.user, data.get('resource_id'), inicio, fin, repeat_weeks)
+        reservas = crear_reservas(request.user, data.get('resource_id'), inicio, fin, repeat_weeks, pago=data.get('pago'))
     except ReservaError as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
     return JsonResponse({
         'success': True,
         'reservas': [{'start': r.start_time.isoformat(), 'end': r.end_time.isoformat()} for r in reservas],
+        'total': str(sum(r.amount for r in reservas)),
+        'referencia': reservas[0].payment_ref,
     })
 
 
@@ -225,3 +232,14 @@ def cancelar_reserva(request, booking_id):
         reserva.delete()
         messages.success(request, f"Reserva cancelada: {texto}. El horario quedó libre.")
     return redirect('mis_reservas')
+
+
+@login_required
+def mi_metodo_pago(request):
+    """HU-1: ver y eliminar el método de pago guardado."""
+    perfil = PaymentProfile.objects.filter(user=request.user).first()
+    if request.method == 'POST' and perfil:
+        perfil.delete()
+        messages.success(request, "Se eliminó tu método de pago guardado.")
+        return redirect('mi_metodo_pago')
+    return render(request, 'reservas/mi_metodo_pago.html', {'perfil': perfil})

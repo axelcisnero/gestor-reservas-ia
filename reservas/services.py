@@ -1,10 +1,13 @@
 """Lógica de negocio de reservas, separada de las vistas para poder probarla."""
 from datetime import timedelta
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import transaction
 from django.utils import timezone
+from django.views.decorators.debug import sensitive_variables
 
 from .models import Availability, Booking, Resource
+from .pagos import PagoError, cobrar
 
 MAX_SEMANAS_REPETICION = 52
 
@@ -26,7 +29,14 @@ def validar_franja(resource, inicio, fin, semana=None):
         raise ReservaError(f"Conflicto: ya existe una reserva en esa franja{sufijo}.")
 
 
-def crear_reservas(user, resource_id, inicio, fin, repeat_weeks=0, **extra):
+def monto_por_reserva(resource, inicio, fin):
+    """HU-1: precio por hora × horas, redondeado a centavos."""
+    horas = Decimal((fin - inicio).total_seconds()) / Decimal(3600)
+    return (resource.price_per_hour * horas).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+@sensitive_variables('pago')
+def crear_reservas(user, resource_id, inicio, fin, repeat_weeks=0, pago=None):
     """Crea una reserva (y sus repeticiones semanales) de forma atómica: todas o ninguna."""
     if inicio is None or fin is None:
         raise ReservaError("Fecha u hora inválida.")
@@ -53,8 +63,17 @@ def crear_reservas(user, resource_id, inicio, fin, repeat_weeks=0, **extra):
         # 1) validar TODAS las semanas antes de guardar nada
         for i, (ini, f) in enumerate(franjas, start=1):
             validar_franja(resource, ini, f, semana=i if repeat_weeks else None)
-        # 2) guardar todas
+        # 2) cobrar (HU-1); si el pago falla no se guarda nada
+        monto = monto_por_reserva(resource, inicio, fin)
+        referencia = ""
+        if monto > 0:
+            try:
+                referencia = cobrar(user, monto * len(franjas), pago)
+            except PagoError as e:
+                raise ReservaError(str(e))
+        # 3) guardar todas
         return [
-            Booking.objects.create(user=user, resource=resource, start_time=ini, end_time=f, **extra)
+            Booking.objects.create(user=user, resource=resource, start_time=ini, end_time=f,
+                                   amount=monto, payment_ref=referencia)
             for ini, f in franjas
         ]

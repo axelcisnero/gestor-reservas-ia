@@ -40,6 +40,19 @@
             background: #1e40af;
         }
 
+        /* === HU-1: CHECKOUT === */
+        .co-fondo { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 2000; align-items: center; justify-content: center; }
+        .co-caja { background: #fff; border-radius: 12px; padding: 22px 26px; width: 380px; max-width: 92vw; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+        .co-caja h3 { margin-top: 0; }
+        .co-caja input { width: 100%; box-sizing: border-box; padding: 8px; margin: 4px 0; border: 1px solid #d1d5db; border-radius: 6px; }
+        .co-fila { display: flex; gap: 6px; }
+        .co-total { font-size: 1.05rem; }
+        .co-btn { width: 100%; padding: 10px; margin-top: 8px; border: 0; border-radius: 6px; cursor: pointer; background: #e5e7eb; font-size: 1rem; }
+        .co-principal { background: #10b981; color: #fff; font-weight: bold; }
+        .co-mini { font-size: .85rem; color: #6b7280; }
+        .co-mini input { width: auto; }
+        .co-error { color: #b91c1c; font-weight: bold; min-height: 1em; }
+
         /* === NAVBAR === */
         .navbar {
             position: fixed;
@@ -115,6 +128,7 @@
     </nav>
 
     <h1>Calendario Interactivo - {{ resource.name }}</h1>
+    <p style="text-align:center;color:#374151">{% if precio_hora > 0 %}Precio: <strong>${{ precio_hora }}</strong> por hora{% else %}Recurso gratuito{% endif %}{% if perfil_pago %} · Método guardado: <a href="{% url 'mi_metodo_pago' %}">{{ perfil_pago.etiqueta }}</a>{% endif %}</p>
 
     {% if not is_authenticated %}
     <div style="text-align:center; margin-bottom:20px; color:#b91c1c; font-weight:bold;">
@@ -128,7 +142,45 @@
     <!-- Contenedor del calendario con data-resource-id y user-logged -->
     <div id='calendar' 
          data-resource-id="{{ resource.id }}" 
-         data-user-logged="{{ is_authenticated }}">
+         data-user-logged="{{ is_authenticated }}"
+         data-precio-hora="{{ precio_hora|stringformat:'s' }}"
+         data-perfil-pago="{{ perfil_pago.etiqueta|default:'' }}">
+    </div>
+
+    <!-- HU-1: checkout con datos de pago guardados -->
+    <div id="checkout" class="co-fondo">
+        <div class="co-caja">
+            <h3>Confirmar reserva</h3>
+            <p><strong>{{ resource.name }}</strong><br><span id="co-franja"></span></p>
+            <label>Repetir semanas siguientes:
+                <input id="co-repeat" type="number" min="0" max="52" value="0" style="width:60px">
+            </label>
+            <p class="co-total">Total: <strong id="co-total"></strong></p>
+
+            <div id="co-pago">
+                <div id="co-guardado">
+                    <button id="co-pagar-guardado" class="co-btn co-principal">Pagar con {{ perfil_pago.etiqueta }}</button>
+                    <p class="co-mini"><a href="#" id="co-otra">Usar otra tarjeta</a></p>
+                </div>
+                <div id="co-tarjeta">
+                    <input id="co-titular" placeholder="Titular" autocomplete="cc-name">
+                    <input id="co-numero" placeholder="Número de tarjeta" inputmode="numeric" autocomplete="cc-number">
+                    <div class="co-fila">
+                        <input id="co-mes" placeholder="MM" inputmode="numeric" autocomplete="cc-exp-month">
+                        <input id="co-anio" placeholder="AAAA" inputmode="numeric" autocomplete="cc-exp-year">
+                        <input id="co-cvv" placeholder="CVV" inputmode="numeric" autocomplete="cc-csc">
+                    </div>
+                    <label class="co-mini"><input id="co-guardar" type="checkbox" checked> Guardar mis datos para la próxima vez
+                        (solo marca, últimos 4 dígitos y vencimiento)</label>
+                    <button id="co-pagar-tarjeta" class="co-btn co-principal">Pagar y reservar</button>
+                    <p class="co-mini">Pago simulado. Tarjeta de prueba: 4242 4242 4242 4242.</p>
+                </div>
+            </div>
+            <!-- Recursos gratuitos: confirmar sin pago -->
+            <button id="co-confirmar-gratis" class="co-btn co-principal">Confirmar reserva</button>
+            <p id="co-error" class="co-error"></p>
+            <button id="co-cancelar" class="co-btn">Cancelar</button>
+        </div>
     </div>
 
     <script>
@@ -193,9 +245,7 @@
                         return;
                     }
 
-                    if (confirm(`¿Quieres crear una reserva desde ${info.startStr} hasta ${info.endStr}?`)) {
-                        crearReserva(info.startStr, info.endStr);
-                    }
+                    abrirCheckout(info.startStr, info.endStr);
                 },
                 eventSources: [
     {
@@ -216,13 +266,55 @@
 
             calendar.render();
 
-            // === FUNCIÓN CREAR RESERVA CON REPETICIONES ===
-            function crearReserva(start, end) {
-                let repeat = prompt("¿Cuántas semanas quieres repetir esta reserva? (0 = solo esta semana)", "0");
-                if (repeat === null) return;
-                repeat = parseInt(repeat);
-                if (isNaN(repeat) || repeat < 0) repeat = 0;
+            // === HU-1: CHECKOUT CON DATOS DE PAGO GUARDADOS ===
+            const precioHora = parseFloat(calendarElement.dataset.precioHora || '0');
+            const perfilPago = calendarElement.dataset.perfilPago || '';
+            const modal = document.getElementById('checkout');
+            let seleccion = null;
 
+            function totalActual() {
+                const horas = (new Date(seleccion.end) - new Date(seleccion.start)) / 3600000;
+                const semanas = Math.max(0, parseInt(document.getElementById('co-repeat').value) || 0) + 1;
+                return { porReserva: precioHora * horas, total: precioHora * horas * semanas, semanas };
+            }
+            function pintarTotal() {
+                const t = totalActual();
+                document.getElementById('co-total').textContent = precioHora > 0
+                    ? `$${t.total.toFixed(2)} (${t.semanas} × $${t.porReserva.toFixed(2)})` : 'Gratis';
+            }
+            function mostrarFormularioTarjeta(mostrar) {
+                document.getElementById('co-tarjeta').style.display = mostrar ? 'block' : 'none';
+                document.getElementById('co-guardado').style.display = (!mostrar && perfilPago) ? 'block' : 'none';
+            }
+            function abrirCheckout(start, end) {
+                seleccion = { start, end };
+                const f = d => new Date(d).toLocaleString('es-PA', { dateStyle: 'medium', timeStyle: 'short' });
+                document.getElementById('co-franja').textContent = `${f(start)} → ${new Date(end).toLocaleTimeString('es-PA', { timeStyle: 'short' })}`;
+                document.getElementById('co-repeat').value = 0;
+                document.getElementById('co-error').textContent = '';
+                document.getElementById('co-pago').style.display = precioHora > 0 ? 'block' : 'none';
+                document.getElementById('co-confirmar-gratis').style.display = precioHora > 0 ? 'none' : 'block';
+                mostrarFormularioTarjeta(!perfilPago);
+                pintarTotal();
+                modal.style.display = 'flex';
+            }
+            document.getElementById('co-repeat').addEventListener('input', pintarTotal);
+            document.getElementById('co-cancelar').addEventListener('click', () => modal.style.display = 'none');
+            document.getElementById('co-otra').addEventListener('click', e => { e.preventDefault(); mostrarFormularioTarjeta(true); });
+            document.getElementById('co-confirmar-gratis').addEventListener('click', () => enviarReserva(null));
+            document.getElementById('co-pagar-guardado').addEventListener('click', () => enviarReserva({ modo: 'guardado' }));
+            document.getElementById('co-pagar-tarjeta').addEventListener('click', () => {
+                const v = id => document.getElementById(id).value;
+                enviarReserva(precioHora > 0 ? {
+                    modo: 'tarjeta', numero: v('co-numero'), titular: v('co-titular'),
+                    mes: v('co-mes'), anio: v('co-anio'), cvv: v('co-cvv'),
+                    guardar: document.getElementById('co-guardar').checked
+                } : null);
+            });
+
+            function enviarReserva(pago) {
+                const repeat = Math.max(0, parseInt(document.getElementById('co-repeat').value) || 0);
+                const start = seleccion.start, end = seleccion.end;
                 fetch('/api/reservas/crear/', {
                     method: 'POST',
                     headers: {
@@ -233,7 +325,8 @@
                         resource_id: resourceId,
                         start_time: start,
                         end_time: end,
-                        repeat_weeks: repeat
+                        repeat_weeks: repeat,
+                        pago: pago
                     })
                 })
                 .then(async response => {
@@ -247,13 +340,16 @@
                 })
                 .then(data => {
                     if (data.success) {
-                        alert(`Reserva(s) creada(s) correctamente: ${data.reservas.length} reserva(s).`);
+                        modal.style.display = 'none';
+                        const pagoTxt = parseFloat(data.total) > 0 ? ` Total pagado: $${data.total} (ref. ${data.referencia}).` : '';
+                        alert(`Reserva(s) creada(s) correctamente: ${data.reservas.length}.${pagoTxt}`);
                         calendar.refetchEvents();
+                        if (pago && pago.guardar) { location.reload(); }
                     } else {
-                        alert(data.error || 'Error al crear la reserva.');
+                        document.getElementById('co-error').textContent = data.error || 'Error al crear la reserva.';
                     }
                 })
-                .catch(error => { console.error('Error:', error); alert(error.message); });
+                .catch(error => { console.error('Error:', error); document.getElementById('co-error').textContent = error.message; });
             }
 
             // Función para obtener CSRF
