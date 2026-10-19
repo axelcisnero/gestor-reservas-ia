@@ -36,8 +36,8 @@
                     <td>{{ r.start_time|date:"d/m/Y" }}</td>
                     <td>{{ r.start_time|time:"H:i" }} – {{ r.end_time|time:"H:i" }}</td>
                     <td class="text-right">
-                        <form method="post" action="{% url 'cancelar_reserva' r.id %}"
-                              onsubmit="return confirm('¿Cancelar la reserva de {{ r.resource.name }} el {{ r.start_time|date:"d/m/Y H:i" }}?');">
+                        <form method="post" action="{% url 'cancelar_reserva' r.id %}" class="form-cancelar"
+                              data-confirmacion="¿Cancelar la reserva de {{ r.resource.name }} el {{ r.start_time|date:'d/m/Y H:i' }}?">
                             {% csrf_token %}
                             <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Cancelar</button>
                         </form>
@@ -60,5 +60,13 @@
         </div>
         {% endif %}
     </div>
+    <script>
+        // El texto viaja en un atributo data-* (escapado por Django) y no dentro de código JS.
+        document.querySelectorAll('.form-cancelar').forEach(function (f) {
+            f.addEventListener('submit', function (e) {
+                if (!confirm(f.dataset.confirmacion)) e.preventDefault();
+            });
+        });
+    </script>
 </body>
 </html>

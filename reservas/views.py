@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, time
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.http import JsonResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
@@ -157,7 +158,11 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user:
             login(request, user)
-            return redirect('/')
+            # Volver a la página que pidió el login (?next=), solo si es de este sitio.
+            siguiente = request.POST.get('next') or request.GET.get('next') or '/'
+            if not url_has_allowed_host_and_scheme(siguiente, allowed_hosts={request.get_host()}):
+                siguiente = '/'
+            return redirect(siguiente)
         else:
             messages.error(request, "Usuario o contraseña incorrectos.")
     return render(request, 'reservas/login.html')

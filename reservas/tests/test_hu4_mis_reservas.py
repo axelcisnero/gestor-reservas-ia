@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from django.contrib.auth.models import User
 from django.urls import reverse
+from django.utils import timezone
 
 from reservas.models import Booking
 
@@ -48,8 +49,38 @@ class MisReservasTests(BaseCase):
 
     def test_no_puedo_cancelar_reserva_pasada(self):
         self.client.force_login(self.user)
-        self.client.post(reverse("cancelar_reserva", args=[self.pasada.id]))
+        r = self.client.post(reverse("cancelar_reserva", args=[self.pasada.id]), follow=True)
+        self.assertRedirects(r, reverse("mis_reservas"))
+        self.assertContains(r, "No se puede cancelar")
         self.assertTrue(Booking.objects.filter(pk=self.pasada.id).exists())
+
+    def test_no_puedo_cancelar_reserva_en_curso(self):
+        ahora = timezone.now()
+        en_curso = Booking.objects.create(user=self.user, resource=self.pista,
+                                          start_time=ahora - timedelta(minutes=30),
+                                          end_time=ahora + timedelta(minutes=30))
+        self.client.force_login(self.user)
+        self.client.post(reverse("cancelar_reserva", args=[en_curso.id]))
+        self.assertTrue(Booking.objects.filter(pk=en_curso.id).exists())
+
+    def test_nombre_con_comillas_no_rompe_ni_inyecta_js(self):
+        """Hallazgo de la revisión del PR #9: XSS en el confirm()."""
+        self.pista.name = "x');alert(1);('"
+        self.pista.save()
+        self.client.force_login(self.user)
+        r = self.client.get(reverse("mis_reservas"))
+        self.assertNotContains(r, "onsubmit=")
+        self.assertContains(r, 'data-confirmacion="¿Cancelar la reserva de x&#x27;);alert(1);(&#x27;')
+
+    def test_login_vuelve_a_la_pagina_pedida(self):
+        r = self.client.post(reverse("login") + "?next=/mis-reservas/",
+                             {"username": "ana", "password": "clave-segura-123"})
+        self.assertRedirects(r, "/mis-reservas/", fetch_redirect_response=False)
+
+    def test_login_ignora_next_externo(self):
+        r = self.client.post(reverse("login") + "?next=https://evil.example/",
+                             {"username": "ana", "password": "clave-segura-123"})
+        self.assertRedirects(r, "/", fetch_redirect_response=False)
 
     def test_cancelar_por_get_no_permitido(self):
         self.client.force_login(self.user)
