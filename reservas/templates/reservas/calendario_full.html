@@ -5,6 +5,8 @@
     <title>Calendario Interactivo - {{ resource.name }}</title>
     <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css' rel='stylesheet' />
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+    <!-- Idioma español (antes locale:'es' no tenía efecto porque faltaba este archivo) -->
+    <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.11/locales/es.global.min.js'></script>
 
     <style>
         body {
@@ -39,6 +41,12 @@
         #btn-refresh:hover {
             background: #1e40af;
         }
+
+        /* === HU-2: LEYENDA === */
+        .leyenda { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin: 0 auto 10px; font-size: .9rem; color: #374151; }
+        .leyenda i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; margin-right: 5px; vertical-align: -2px; border: 1px solid #d1d5db; }
+        .leyenda-ayuda { color: #6b7280; font-style: italic; }
+        .dia-completo, .dia-bloqueado, .dia-pasado { cursor: not-allowed; }
 
         /* === HU-1: CHECKOUT === */
         .co-fondo { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 2000; align-items: center; justify-content: center; }
@@ -136,6 +144,16 @@
     </div>
     {% endif %}
 
+    <!-- HU-2: leyenda de disponibilidad -->
+    <div class="leyenda">
+        <span><i style="background:#bbf7d0"></i>Libre</span>
+        <span><i style="background:#fde68a"></i>Parcial</span>
+        <span><i style="background:#fca5a5"></i>Completo</span>
+        <span><i style="background:#9ca3af"></i>Bloqueado</span>
+        <span><i style="background:#e5e7eb"></i>Pasado</span>
+        <span class="leyenda-ayuda">Toca un día para ver sus horas libres.</span>
+    </div>
+
     <!-- Botón para actualizar eventos -->
     <button id="btn-refresh">🔄 Actualizar Reservas</button>
     
@@ -219,10 +237,43 @@
                 return false;
             }
 
+            // === HU-2: estado de cada día (libre/parcial/completo/bloqueado/pasado) ===
+            const estadoPorDia = {};
+            const textoEstado = {
+                completo: 'Ese día ya está completo. Elige otra fecha.',
+                bloqueado: 'Ese día está bloqueado por el administrador.',
+                pasado: 'No se puede reservar en días pasados.'
+            };
+
+            function abrirDia(fecha) {
+                const estado = estadoPorDia[fecha];
+                if (textoEstado[estado]) { alert(textoEstado[estado]); return; }
+                calendar.changeView('timeGridDay', fecha);
+            }
+
             var calendar = new FullCalendar.Calendar(calendarElement, {
-                initialView: 'timeGridWeek',
+                initialView: 'dayGridMonth',
                 locale: 'es',
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' },
+                buttonText: { today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día' },
                 selectable: true,
+                // En la vista mensual se elige el día; las horas se eligen en semana/día y nunca en el pasado
+                selectAllow: info => calendar.view.type !== 'dayGridMonth' && info.start >= new Date(),
+                dayMaxEvents: 2,   // en la vista mensual: "+N más" en lugar de llenar la celda
+                dateClick: function(info) {
+                    if (calendar.view.type === 'dayGridMonth') abrirDia(info.dateStr);
+                },
+                // Un clic sobre una reserva en la vista mensual equivale a elegir ese día
+                eventClick: function(info) {
+                    if (calendar.view.type !== 'dayGridMonth' || info.event.display === 'background') return;
+                    info.jsEvent.preventDefault();
+                    abrirDia(info.event.startStr.slice(0, 10));
+                },
+                dayCellClassNames: arg => {
+                    const y = arg.date.getFullYear(), m = String(arg.date.getMonth() + 1).padStart(2, '0'), d = String(arg.date.getDate()).padStart(2, '0');
+                    const estado = estadoPorDia[`${y}-${m}-${d}`];
+                    return estado ? ['dia-' + estado] : [];
+                },
                 slotMinTime: "09:00:00", // Horario inicial
                 slotMaxTime: "21:00:00", // Horario final
                 slotDuration: "01:00:00",
@@ -248,6 +299,14 @@
                     abrirCheckout(info.startStr, info.endStr);
                 },
                 eventSources: [
+    {
+        // HU-2: colores de fondo por día calculados en el servidor
+        url: '/api/disponibilidad/{{ resource.id }}/',
+        success: function(eventos) {
+            eventos.forEach(e => { estadoPorDia[e.start] = e.extendedProps.estado; });
+            return eventos;
+        }
+    },
     {
         url: '/api/reservas/{{ resource.id }}/',
         method: 'GET',
