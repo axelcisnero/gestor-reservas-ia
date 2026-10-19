@@ -75,3 +75,34 @@ class CsrfTests(BaseCase):
     def test_calendario_entrega_cookie_csrf(self):
         r = Client(enforce_csrf_checks=True).get(reverse("calendario_full", args=[self.pista.id]))
         self.assertIn("csrftoken", r.cookies)
+
+
+class HallazgosRevisionTests(BaseCase):
+    """Casos agregados tras la revisión del PR #8 (ver AI_LOG.md)."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.user)
+
+    def test_bloqueo_en_semana_intermedia_no_crea_ninguna(self):
+        Availability.objects.create(resource=self.pista,
+                                    start_time=manana(9) + timedelta(weeks=1),
+                                    end_time=manana(13) + timedelta(weeks=1))
+        r = self.crear(manana(10), manana(11), repeat=2)
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("semana 2", r.json()["error"])
+        self.assertEqual(Booking.objects.count(), 0)
+
+    def test_fecha_sin_zona_horaria_no_da_500(self):
+        inicio = manana(10).replace(tzinfo=None)
+        r = self.client.post(reverse("api_crear_reserva"), content_type="application/json",
+                             data=json.dumps({"resource_id": self.pista.id,
+                                              "start_time": inicio.isoformat(),
+                                              "end_time": (inicio + timedelta(hours=1)).isoformat()}))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(Booking.objects.count(), 1)
+
+    def test_json_que_no_es_objeto_da_400(self):
+        for cuerpo in ("[]", '"x"', "1"):
+            r = self.client.post(reverse("api_crear_reserva"), data=cuerpo, content_type="application/json")
+            self.assertEqual(r.status_code, 400, cuerpo)

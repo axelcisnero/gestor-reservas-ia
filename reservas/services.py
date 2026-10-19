@@ -30,6 +30,11 @@ def crear_reservas(user, resource_id, inicio, fin, repeat_weeks=0, **extra):
     """Crea una reserva (y sus repeticiones semanales) de forma atómica: todas o ninguna."""
     if inicio is None or fin is None:
         raise ReservaError("Fecha u hora inválida.")
+    # Fechas sin zona horaria se interpretan en la zona del sistema (America/Panama).
+    if timezone.is_naive(inicio):
+        inicio = timezone.make_aware(inicio)
+    if timezone.is_naive(fin):
+        fin = timezone.make_aware(fin)
     if fin <= inicio:
         raise ReservaError("La hora de fin debe ser posterior a la de inicio.")
     if inicio < timezone.now():
@@ -38,7 +43,8 @@ def crear_reservas(user, resource_id, inicio, fin, repeat_weeks=0, **extra):
         raise ReservaError(f"Las repeticiones deben estar entre 0 y {MAX_SEMANAS_REPETICION} semanas.")
 
     with transaction.atomic():
-        # Bloquea la fila del recurso para que dos peticiones simultáneas no reserven lo mismo.
+        # En PostgreSQL/MySQL bloquea la fila del recurso para serializar reservas simultáneas.
+        # Limitación conocida: SQLite ignora select_for_update (ver AI_LOG.md).
         try:
             resource = Resource.objects.select_for_update().get(pk=resource_id)
         except (Resource.DoesNotExist, ValueError, TypeError):

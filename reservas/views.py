@@ -128,6 +128,8 @@ def api_crear_reserva(request):
         return JsonResponse({'success': False, 'error': 'Debes iniciar sesión para reservar.'}, status=403)
     try:
         data = json.loads(request.body)
+        if not isinstance(data, dict):
+            raise ValueError("Se esperaba un objeto JSON")
         repeat_weeks = int(data.get('repeat_weeks', 0) or 0)
         inicio = parse_datetime(data.get('start_time') or '')
         fin = parse_datetime(data.get('end_time') or '')
