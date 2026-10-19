@@ -125,3 +125,52 @@ class CheckoutTests(BaseCase):
         a = PaymentProfile.objects.create(user=self.user, holder_name="A", brand="Visa", last4="1111", exp_month=1, exp_year=2099)
         b = PaymentProfile.objects.create(user=otro, holder_name="B", brand="Visa", last4="2222", exp_month=1, exp_year=2099)
         self.assertNotEqual(a.token, b.token)
+
+
+class HallazgosRevisionPagosTests(CheckoutTests):
+    """Casos agregados tras la revisión del PR #10 (ver AI_LOG.md)."""
+
+    def test_tipos_invalidos_no_dan_500_ni_filtran_la_tarjeta(self):
+        from django.test import override_settings
+        with override_settings(DEBUG=True):
+            for campo, valor in (("titular", 5), ("titular", ["x"]), ("numero", {"a": 1}), ("cvv", True)):
+                r = self.reservar(tarjeta(**{"cvv": "999", campo: valor}))
+                self.assertEqual(r.status_code, 400, campo)
+                self.assertNotIn(b"4242424242424242", r.content)
+                self.assertNotIn(b"999", r.content)
+
+    def test_titular_demasiado_largo(self):
+        r = self.reservar(tarjeta(titular="A" * 101))
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("100", r.json()["error"])
+
+    def test_reporte_de_error_en_produccion_oculta_la_tarjeta(self):
+        """Con DEBUG=False, el reporte de error (correo/log a administradores) no incluye número ni CVV.
+
+        Nota: con DEBUG=True Django muestra todas las variables a propósito (solo desarrollo);
+        sensitive_variables protege los reportes de producción.
+        """
+        import sys
+        from unittest import mock
+        from django.test import RequestFactory, override_settings
+        from django.views.debug import ExceptionReporter
+        from reservas.services import crear_reservas
+        request = RequestFactory().post("/api/reservas/crear/")
+        request.user = self.user
+        with override_settings(DEBUG=False), mock.patch("reservas.pagos.uuid.uuid4", side_effect=RuntimeError("falla")):
+            try:
+                crear_reservas(self.user, self.pista.id, manana(10), manana(11), pago=tarjeta(cvv="999"))
+            except RuntimeError:
+                datos = ExceptionReporter(request, *sys.exc_info()).get_traceback_data()
+        variables = {n: str(v) for f in datos["frames"] for n, v in f.get("vars", [])}
+        self.assertIn("pago", variables)                       # la variable existe en el reporte...
+        texto = " ".join(variables.values())
+        self.assertNotIn("4242 4242 4242 4242", texto)         # ...pero su contenido está oculto
+        self.assertNotIn("'999'", texto)
+
+    def test_recurso_gratuito_muestra_boton_confirmar(self):
+        self.pista.price_per_hour = 0
+        self.pista.save()
+        r = self.client.get(reverse("calendario_full", args=[self.pista.id]))
+        self.assertContains(r, 'id="co-confirmar-gratis"')
+        self.assertContains(r, "enviarReserva(null)")

@@ -13,6 +13,7 @@ Herramientas: **Claude** (agente de escritorio, Claude app / Claude Code) y **Gi
 | 6 | 2026-10-19 | Código HU-4 | Claude (desarrollador) | Página Mis reservas y cancelación | Vista, plantilla y 6 pruebas | **Modificado** tras revisión (entrada 7) |
 | 7 | 2026-10-19 | Revisión HU-4 | Claude (agente revisor independiente) | Revisar el diff del PR #9 | 4 hallazgos: **XSS** en `confirm()`, login ignoraba `?next=`, pruebas incompletas, enlace escrito a mano | **4 corregidos** en el mismo PR |
 | 8 | 2026-10-19 | Código HU-1 | Claude (desarrollador) | Pago simulado con datos guardados | Modelos `PaymentProfile`, `pagos.py` (Luhn, marca, vencimiento, CVV), checkout en el calendario, 15 pruebas | **Modificado**: token con valor fijo detectado en revisión humana de la migración |
+| 9 | 2026-10-19 | Revisión HU-1 | Claude (agente revisor independiente) | Revisar el diff del PR #10 (seguridad, XSS, montos, atomicidad, JS) | 4 hallazgos: recursos gratis sin botón para confirmar, tarjeta y CVV visibles en la página de error 500, titular sin límite de largo, diferencia de 1 centavo en el monto mostrado | **3 corregidos, 1 rechazado** (el del centavo) |
 
 ## Respuestas incorrectas de la IA
 
@@ -25,9 +26,14 @@ Herramientas: **Claude** (agente de escritorio, Claude app / Claude Code) y **Gi
 
 5. **Token igual para todos (HU-1).** La IA escribió `token = models.CharField(default=uuid.uuid4().hex)`. Eso se evalúa **una sola vez** al importar el módulo, así que todos los perfiles de pago recibirían el mismo token. Se detectó al revisar la migración generada (el valor aparecía fijo). Corrección: función `nuevo_token()` como callable, `unique=True` y prueba de regresión.
 
+6. **Regresión en HU-1:** al ocultar el bloque de pago para recursos gratuitos, la IA también ocultó el único botón para confirmar, así que esos recursos ya no se podían reservar desde la interfaz. Las pruebas no lo detectaron porque llamaban a la API directamente. Corregido con el botón "Confirmar reserva" y una prueba de la plantilla.
+7. **Fuga de datos sensibles:** si llegaba `titular` como número, `.strip()` daba error 500 y la página de error mostraba el número de tarjeta y el CVV. Se validan los tipos y se marcaron `@sensitive_variables` en la vista, el servicio y el módulo de pagos.
+8. **Afirmación incorrecta del revisor IA:** dijo que `@sensitive_variables` ocultaría la tarjeta en la página de error con `DEBUG=True`. **Es falso**: Django solo filtra cuando `DEBUG=False`, porque esa página es de desarrollo y muestra todo a propósito. Lo comprobamos ejecutándolo. `DEBUG` ahora se controla con la variable `DJANGO_DEBUG`.
+9. **Prueba que no probaba nada:** la primera prueba de la IA para ese filtro revisaba el correo de error en texto plano, que no incluye variables locales. Pasaba **incluso quitando los decoradores**. Lo detectamos al hacer esa prueba de mutación. Se reescribió con `ExceptionReporter`: ahora pasa con los decoradores y falla sin ellos.
+
 ## Cambios de la IA rechazados
 
-_(se completa durante el sprint)_
+1. **Revisión de HU-1, hallazgo 4 (diferencia de 1 centavo).** El revisor propuso que el monto del modal se calculara en el servidor, porque con duraciones fraccionarias el `toFixed()` de JavaScript puede diferir 1 centavo del cobro. **Rechazado:** el calendario usa franjas de 1 hora completa (precio × horas exacto), el servidor es la fuente de verdad del cobro y el mensaje de confirmación muestra el total real cobrado (`data.total`). No justifica otra llamada a la API.
 
 ## Decisiones tomadas por humanos
 

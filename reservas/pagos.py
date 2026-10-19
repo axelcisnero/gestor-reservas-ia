@@ -9,6 +9,7 @@ import uuid
 from decimal import Decimal
 
 from django.utils import timezone
+from django.views.decorators.debug import sensitive_variables
 
 from .models import PaymentProfile
 
@@ -41,17 +42,34 @@ def detectar_marca(numero: str) -> str:
     return "Tarjeta"
 
 
+MAX_TITULAR = 100
+
+
+def _texto(valor):
+    """Solo acepta texto o números; cualquier otro tipo (listas, objetos) es inválido."""
+    if valor is None:
+        return ""
+    if isinstance(valor, bool) or not isinstance(valor, (str, int)):
+        raise PagoError("Datos de pago inválidos.")
+    return str(valor).strip()
+
+
+@sensitive_variables("numero", "cvv")
 def validar_tarjeta(numero, titular, mes, anio, cvv):
     """Valida los datos del formulario y devuelve solo lo que se puede guardar."""
-    numero = re.sub(r"[\s-]", "", str(numero or ""))
-    titular = (titular or "").strip()
-    cvv = str(cvv or "").strip()
+    numero = re.sub(r"[\s-]", "", _texto(numero))
+    if titular is not None and not isinstance(titular, str):
+        raise PagoError("Datos de pago inválidos.")
+    titular = _texto(titular)
+    cvv = _texto(cvv)
     if not titular:
         raise PagoError("Ingresa el nombre del titular.")
+    if len(titular) > MAX_TITULAR:
+        raise PagoError(f"El nombre del titular no puede superar {MAX_TITULAR} caracteres.")
     if not luhn_valido(numero):
         raise PagoError("El número de tarjeta no es válido.")
     try:
-        mes, anio = int(mes), int(anio)
+        mes, anio = int(_texto(mes)), int(_texto(anio))
     except (TypeError, ValueError):
         raise PagoError("Fecha de vencimiento inválida.")
     if anio < 100:
@@ -78,6 +96,7 @@ def perfil_vigente(user):
     return perfil
 
 
+@sensitive_variables("pago", "datos")
 def cobrar(user, monto: Decimal, pago: dict | None) -> str:
     """Cobra el monto (simulado) y devuelve la referencia del pago.
 

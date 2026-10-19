@@ -7,6 +7,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.http import JsonResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
+from django.views.decorators.debug import sensitive_post_parameters, sensitive_variables
 from django.utils.dateformat import format as date_format
 from django.utils.dateparse import parse_datetime
 from django.contrib.auth import authenticate, login, logout
@@ -124,6 +125,7 @@ def calendario_full(request, resource_id):
 
 
 
+@sensitive_variables('data')
 @require_POST
 def api_crear_reserva(request):
     """

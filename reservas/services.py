@@ -4,6 +4,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from django.db import transaction
 from django.utils import timezone
+from django.views.decorators.debug import sensitive_variables
 
 from .models import Availability, Booking, Resource
 from .pagos import PagoError, cobrar
@@ -34,6 +35,7 @@ def monto_por_reserva(resource, inicio, fin):
     return (resource.price_per_hour * horas).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+@sensitive_variables('pago')
 def crear_reservas(user, resource_id, inicio, fin, repeat_weeks=0, pago=None):
     """Crea una reserva (y sus repeticiones semanales) de forma atómica: todas o ninguna."""
     if inicio is None or fin is None:

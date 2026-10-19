@@ -176,6 +176,8 @@
                     <p class="co-mini">Pago simulado. Tarjeta de prueba: 4242 4242 4242 4242.</p>
                 </div>
             </div>
+            <!-- Recursos gratuitos: confirmar sin pago -->
+            <button id="co-confirmar-gratis" class="co-btn co-principal">Confirmar reserva</button>
             <p id="co-error" class="co-error"></p>
             <button id="co-cancelar" class="co-btn">Cancelar</button>
         </div>
@@ -291,6 +293,7 @@
                 document.getElementById('co-repeat').value = 0;
                 document.getElementById('co-error').textContent = '';
                 document.getElementById('co-pago').style.display = precioHora > 0 ? 'block' : 'none';
+                document.getElementById('co-confirmar-gratis').style.display = precioHora > 0 ? 'none' : 'block';
                 mostrarFormularioTarjeta(!perfilPago);
                 pintarTotal();
                 modal.style.display = 'flex';
@@ -298,6 +301,7 @@
             document.getElementById('co-repeat').addEventListener('input', pintarTotal);
             document.getElementById('co-cancelar').addEventListener('click', () => modal.style.display = 'none');
             document.getElementById('co-otra').addEventListener('click', e => { e.preventDefault(); mostrarFormularioTarjeta(true); });
+            document.getElementById('co-confirmar-gratis').addEventListener('click', () => enviarReserva(null));
             document.getElementById('co-pagar-guardado').addEventListener('click', () => enviarReserva({ modo: 'guardado' }));
             document.getElementById('co-pagar-tarjeta').addEventListener('click', () => {
                 const v = id => document.getElementById(id).value;
