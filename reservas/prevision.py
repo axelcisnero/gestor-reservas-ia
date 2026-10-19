@@ -23,18 +23,24 @@ def inicio_semana(fecha):
 
 
 def horas_por_semana(resource, semanas=SEMANAS_HISTORICO, hoy=None):
-    """Horas reservadas en cada una de las últimas `semanas` semanas completas (lunes a domingo)."""
+    """Horas reservadas en cada una de las últimas `semanas` semanas completas (lunes a domingo).
+
+    Una reserva que cruza de una semana a otra reparte sus horas entre ambas.
+    Cada semana se limita a la capacidad (84 h) por si hay datos fuera del horario.
+    """
     hoy = hoy or timezone.localdate()
     lunes_actual = inicio_semana(hoy)
     lunes = [lunes_actual - timedelta(weeks=semanas - i) for i in range(semanas)]
-    horas = {l: 0.0 for l in lunes}
-    desde = timezone.make_aware(datetime.combine(lunes[0], time.min))
-    hasta = timezone.make_aware(datetime.combine(lunes_actual, time.min))
-    for ini, fin in Booking.objects.filter(resource=resource, start_time__gte=desde, start_time__lt=hasta) \
+    limites = [timezone.make_aware(datetime.combine(l, time.min)) for l in lunes]
+    limites.append(timezone.make_aware(datetime.combine(lunes_actual, time.min)))
+    horas = [0.0] * semanas
+    for ini, fin in Booking.objects.filter(resource=resource, start_time__lt=limites[-1], end_time__gt=limites[0]) \
             .values_list("start_time", "end_time"):
-        semana = inicio_semana(timezone.localtime(ini).date())
-        horas[semana] += (fin - ini).total_seconds() / 3600
-    return lunes, [round(horas[l], 1) for l in lunes]
+        for i in range(semanas):
+            a, b = max(ini, limites[i]), min(fin, limites[i + 1])
+            if a < b:
+                horas[i] += (b - a).total_seconds() / 3600
+    return lunes, [round(min(h, CAPACIDAD_SEMANAL_HORAS), 1) for h in horas]
 
 
 def regresion_lineal(valores):

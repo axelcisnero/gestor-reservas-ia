@@ -76,3 +76,43 @@ class AccesoPanelTests(BaseCase):
         self.assertContains(r, "Previsión de demanda")
         self.assertContains(r, 'id="datos-graficos"')
         self.assertEqual(len(r.context["previsiones"]), Resource.objects.count())
+
+
+class HallazgosRevisionHU3Tests(BaseCase):
+    """Casos agregados tras la revisión del PR #12 (ver AI_LOG.md)."""
+
+    def test_reserva_que_cruza_de_semana_reparte_horas(self):
+        hoy = timezone.localdate()
+        domingo = hoy - timedelta(days=hoy.weekday()) - timedelta(weeks=1) - timedelta(days=1)  # domingo anterior al último lunes completo
+        ini = timezone.make_aware(datetime.combine(domingo, time(20)))
+        Booking.objects.create(user=self.user, resource=self.pista, start_time=ini, end_time=ini + timedelta(hours=26))
+        _, horas = horas_por_semana(self.pista, semanas=3)
+        # domingo 20:00 cae en la penúltima semana (4 h) y el lunes siguiente en la última (22 h)
+        self.assertEqual(horas, [0.0, 4.0, 22.0])
+
+    def test_semana_no_supera_la_capacidad(self):
+        hoy = timezone.localdate()
+        lunes = hoy - timedelta(days=hoy.weekday()) - timedelta(weeks=1)
+        ini = timezone.make_aware(datetime.combine(lunes, time(0)))
+        Booking.objects.create(user=self.user, resource=self.pista, start_time=ini, end_time=ini + timedelta(days=7))
+        self.assertEqual(horas_por_semana(self.pista, semanas=1)[1], [84])
+
+    def test_historico_demo_idempotente_y_sin_solapes(self):
+        nulo = open("/dev/null", "w")
+        call_command("generar_historico_demo", semanas=4, semilla=1, stdout=nulo)
+        primero = Booking.objects.count()
+        call_command("generar_historico_demo", semanas=4, semilla=7, stdout=nulo)
+        self.assertLess(abs(Booking.objects.count() - primero), primero * 0.2)
+        for b in Booking.objects.all()[:300]:
+            self.assertFalse(Booking.objects.filter(resource=b.resource, start_time__lt=b.end_time,
+                                                    end_time__gt=b.start_time).exclude(pk=b.pk).exists())
+
+    def test_demo_respeta_reservas_reales(self):
+        hoy = timezone.localdate()
+        lunes = hoy - timedelta(days=hoy.weekday()) - timedelta(weeks=1)
+        real = Resource.objects.create(name="Pista Pádel 1", price_per_hour=15)
+        ini = timezone.make_aware(datetime.combine(lunes, time(9, 30)))
+        Booking.objects.create(user=self.user, resource=real, start_time=ini, end_time=ini + timedelta(minutes=30))
+        call_command("generar_historico_demo", semanas=2, stdout=open("/dev/null", "w"))
+        self.assertEqual(Booking.objects.filter(resource=real, start_time__lt=ini + timedelta(minutes=30),
+                                                end_time__gt=ini).count(), 1)

@@ -18,6 +18,7 @@ Herramientas: **Claude** (agente de escritorio, Claude app / Claude Code) y **Gi
 | 11 | 2026-10-19 | QA HU-2 | Navegador automatizado (Playwright) dirigido por Claude | Probar el calendario como usuario real | Las pruebas unitarias pasaban, pero: clic sobre un día lleno de reservas no avisaba, bloqueos se veían como "0", se mostraba el usuario de cada reserva y el idioma español nunca cargaba | **4 corregidos** antes de abrir el PR |
 | 12 | 2026-10-19 | Revisión HU-2 | Claude (agente revisor independiente) | Revisar el diff del PR #11 (zonas horarias, bordes, rendimiento, JS) | 4 hallazgos: error 500 con fechas extremas, "hoy" contaba horas ya pasadas, día equivocado si el navegador está en otra zona horaria, pruebas faltantes | **4 corregidos**; verificó que el endpoint hace solo 2 consultas |
 | 13 | 2026-10-19 | Código HU-3 | Claude (desarrollador) | Previsión de demanda para el administrador | `prevision.py` (horas por semana, regresión lineal, ocupación, sugerencia de precio), panel con Chart.js solo para staff, comando `generar_historico_demo`, 10 pruebas | **Aceptado parcialmente** (ver decisiones) |
+| 14 | 2026-10-19 | Revisión HU-3 | Claude (agente revisor independiente) | Revisar el diff del PR #12 (matemática, zona horaria, rendimiento, XSS, comando demo) | 5 hallazgos: reservas que cruzan semana mal contadas, comando demo con solapes y no idempotente, N+1 consultas, guarda en JS, prueba faltante | **4 corregidos, 1 rechazado** (N+1) |
 
 ## Respuestas incorrectas de la IA
 
@@ -40,9 +41,14 @@ Herramientas: **Claude** (agente de escritorio, Claude app / Claude Code) y **Gi
 
 12. **HU-2: el día de hoy contaba las horas que ya pasaron.** A las 15:00, si quedaban reservadas las horas de 15 a 21, el día salía "parcial". El usuario entraba y no podía elegir nada: justo el "intento fallido" que la historia quiere evitar. Las pruebas de la IA usaban días futuros y no lo cubrían. Corregido y probado simulando la hora.
 
+13. **HU-3: horas por semana mal repartidas.** Una reserva que cruzaba de domingo a lunes se contaba entera en la semana en que empezaba, y el histórico podía superar la capacidad de 84 h. Además, el comando demo usaba `get_or_create`, que solo detecta coincidencias exactas, así que creaba **reservas solapadas** (783 con datos previos de 30 min). Corregido: reparto por límites de semana, tope de capacidad y comando idempotente que respeta reservas reales.
+14. **Una prueba escrita mal por la IA:** al agregar la prueba de reservas que cruzan semana, la IA ubicó el domingo en la semana equivocada y la prueba falló aunque el código estaba bien. Se revisó el cálculo a mano antes de "arreglar" el código: el error estaba en la prueba. Luego se comprobó que la prueba corregida **sí falla** con el código anterior.
+
 ## Cambios de la IA rechazados
 
 1. **Revisión de HU-1, hallazgo 4 (diferencia de 1 centavo).** El revisor propuso que el monto del modal se calculara en el servidor, porque con duraciones fraccionarias el `toFixed()` de JavaScript puede diferir 1 centavo del cobro. **Rechazado:** el calendario usa franjas de 1 hora completa (precio × horas exacto), el servidor es la fuente de verdad del cobro y el mensaje de confirmación muestra el total real cobrado (`data.total`). No justifica otra llamada a la API.
+
+2. **Revisión de HU-3, hallazgo 3 (N+1 consultas en el panel de previsión).** El revisor propuso una sola consulta para todos los recursos. **Rechazado:** el panel es solo para administradores, hay pocos recursos (3–4 consultas extra) y la versión por recurso es más fácil de leer y probar. Se retomaría si crece el número de recursos.
 
 ## Decisiones tomadas por humanos
 

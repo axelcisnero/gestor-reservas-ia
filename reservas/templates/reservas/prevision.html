@@ -48,6 +48,7 @@
         const graficos = JSON.parse(document.getElementById('datos-graficos').textContent);
         graficos.forEach(g => {
             const n = g.historico.length;
+            if (!n) return;  // sin histórico no hay gráfico
             // la previsión arranca en el último punto real para que la línea sea continua
             const prevision = Array(n - 1).fill(null).concat([g.historico[n - 1]], g.prevision);
             new Chart(document.getElementById('grafico-' + g.id), {

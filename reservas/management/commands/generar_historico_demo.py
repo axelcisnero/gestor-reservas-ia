@@ -40,14 +40,22 @@ class Command(BaseCommand):
             recurso, _ = Resource.objects.get_or_create(name=nombre, defaults={"price_per_hour": precio})
             recurso.price_per_hour = precio
             recurso.save()
+            # Idempotente: se reemplaza el histórico demo anterior del rango.
+            desde = timezone.make_aware(datetime.combine(lunes_actual - timedelta(weeks=semanas), time.min))
+            hasta = timezone.make_aware(datetime.combine(lunes_actual, time.min))
+            Booking.objects.filter(resource=recurso, payment_ref="DEMO", start_time__gte=desde, start_time__lt=hasta).delete()
+            ocupadas = list(Booking.objects.filter(resource=recurso, start_time__lt=hasta, end_time__gt=desde)
+                            .values_list("start_time", "end_time"))
             for s in range(semanas):
                 lunes = lunes_actual - timedelta(weeks=semanas - s)
                 horas = max(0, min(84, round(base + crecimiento * s + rnd.uniform(-4, 4))))
                 franjas = [(lunes + timedelta(days=d), h) for d in range(7) for h in range(9, 21)]
                 for dia, h in rnd.sample(franjas, horas):
                     ini = timezone.make_aware(datetime.combine(dia, time(h)))
-                    _, nueva = Booking.objects.get_or_create(
-                        resource=recurso, start_time=ini, end_time=ini + timedelta(hours=1),
-                        defaults={"user": rnd.choice(clientes), "amount": precio, "payment_ref": "DEMO"})
-                    creadas += nueva
+                    fin = ini + timedelta(hours=1)
+                    if any(a < fin and b > ini for a, b in ocupadas):
+                        continue  # no solapar reservas reales existentes
+                    Booking.objects.create(resource=recurso, start_time=ini, end_time=fin,
+                                           user=rnd.choice(clientes), amount=precio, payment_ref="DEMO")
+                    creadas += 1
         self.stdout.write(self.style.SUCCESS(f"Histórico creado: {creadas} reservas en {semanas} semanas."))
