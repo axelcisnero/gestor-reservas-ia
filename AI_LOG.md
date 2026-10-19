@@ -11,7 +11,7 @@ Herramientas: **Claude** (agente de escritorio, Claude app / Claude Code) y **Gi
 
 ## Respuestas incorrectas de la IA
 
-_(se completa durante el sprint)_
+1. **CI en rojo en el primer PR (#7).** Claude configuró GitHub Actions con `makemigrations --check`, pero antes de subir solo ejecutó `check` y las pruebas localmente, no ese paso. La CI falló porque el proyecto original tenía una **migración pendiente** (las opciones `Meta` de `Availability` nunca se migraron). La IA dijo que la rama estaba lista sin correr localmente todo lo que corre la CI. Corrección: se generó `0002_availability_meta` y la regla de ahora en adelante es ejecutar localmente los mismos pasos de la CI antes de subir.
 
 ## Cambios de la IA rechazados
 
