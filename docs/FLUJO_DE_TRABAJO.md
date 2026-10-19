@@ -4,12 +4,12 @@
 
 | Historia | Developer | Reviewer | QA |
 |----------|-----------|----------|----|
-| Preparación (#1) | Axel Cisnero | Angel Martinez | Angel Delbiondo |
-| HU-5 (#6) | Axel Cisnero | Angel Martinez | Angel Delbiondo |
-| HU-4 (#5) | Angel Martinez | Angel Delbiondo | Axel Cisnero |
-| HU-1 (#2) | Angel Delbiondo | Axel Cisnero | Angel Martinez |
-| HU-2 (#3) | Axel Cisnero | Angel Delbiondo | Angel Martinez |
-| HU-3 (#4) | Angel Martinez | Axel Cisnero | Angel Delbiondo |
+| Preparación (#1) | Axel Cisnero | Angel Martinez | Angel Del Biondo |
+| HU-5 (#6) | Axel Cisnero | Angel Martinez | Angel Del Biondo |
+| HU-4 (#5) | Angel Martinez | Angel Del Biondo | Axel Cisnero |
+| HU-1 (#2) | Angel Del Biondo | Axel Cisnero | Angel Martinez |
+| HU-2 (#3) | Axel Cisnero | Angel Del Biondo | Angel Martinez |
+| HU-3 (#4) | Angel Martinez | Axel Cisnero | Angel Del Biondo |
 
 ## Reglas
 
