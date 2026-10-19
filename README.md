@@ -2,12 +2,42 @@
 
 > Proyecto #1 de **Tópicos Especiales II** (Prof. Regis Rivera). Basado en
 > [JStack-Dev/Gestor-de-reservas](https://github.com/JStack-Dev/Gestor-de-reservas); el historial original se conserva.
+>
+> **Equipo:** Axel Cisnero · Angel Martinez · Angel Del Biondo
 
-- Historias de usuario: ver los [issues](../../issues).
+## Historias de usuario
+
+| # | Historia | Issue | PR |
+|---|----------|-------|----|
+| HU-1 | Como usuario recurrente, quiero reservar directamente usando mis datos guardados, para no tener que rellenar el formulario de pago en cada compra | #2 | #10 |
+| HU-2 | Como cliente, quiero ver un calendario dinámico con los días disponibles y ocupados, para elegir mi fecha rápidamente sin intentos fallidos | #3 | #11 |
+| HU-3 | Como administrador del sistema, quiero ver gráficos de previsión de la demanda basados en el histórico, para ajustar los precios y el inventario de forma inteligente | #4 | #12 |
+| HU-4 | Como usuario, quiero ver y cancelar mis reservas, para liberar el horario cuando no pueda asistir | #5 | #9 |
+| HU-5 | Como administrador del sistema, quiero que una reserva recurrente se cree completa o no se cree, para no tener reservas a medias cuando hay conflictos | #6 | #8 |
+
 - Flujo de trabajo y roles: [`docs/FLUJO_DE_TRABAJO.md`](docs/FLUJO_DE_TRABAJO.md)
-- Registro de uso de IA: [`AI_LOG.md`](AI_LOG.md)
+- **Registro de uso de IA** (respuestas incorrectas, cambios rechazados, decisiones humanas): [`AI_LOG.md`](AI_LOG.md)
+- Capturas: [`docs/evidencias/`](docs/evidencias/)
+
+## Ejecutar
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate            # Windows  (Linux/Mac: source .venv/bin/activate)
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py crear_reservas_demo        # usuario demo_user / demo1234
+python manage.py generar_historico_demo     # histórico para la previsión (HU-3)
+python manage.py createsuperuser            # para el panel de previsión y /admin
+python manage.py runserver
+python manage.py test                       # pruebas automatizadas
+```
+
+Pago simulado (HU-1): tarjeta de prueba `4242 4242 4242 4242`, vencimiento futuro, CVV `123`.
 
 ---
+
+*README original del proyecto:*
 
 # 🏟️ Gestor de Reservas de Pistas y Salas
 
