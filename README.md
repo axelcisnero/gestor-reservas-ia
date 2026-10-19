@@ -1,3 +1,14 @@
+# Gestor de Reservas — Feature Sprint con IA
+
+> Proyecto #1 de **Tópicos Especiales II** (Prof. Regis Rivera). Basado en
+> [JStack-Dev/Gestor-de-reservas](https://github.com/JStack-Dev/Gestor-de-reservas); el historial original se conserva.
+
+- Historias de usuario: ver los [issues](../../issues).
+- Flujo de trabajo y roles: [`docs/FLUJO_DE_TRABAJO.md`](docs/FLUJO_DE_TRABAJO.md)
+- Registro de uso de IA: [`AI_LOG.md`](AI_LOG.md)
+
+---
+
 # 🏟️ Gestor de Reservas de Pistas y Salas
 
 Un sistema web desarrollado con **Django** para gestionar reservas de recursos como pistas de pádel, tenis, fútbol o salas multiusos.  
