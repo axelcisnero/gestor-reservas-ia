@@ -1,15 +1,19 @@
 # Flujo de trabajo del equipo
 
-## Equipo y roles (rotan por historia)
+## Equipo y roles
 
-| Historia | Developer | Reviewer | QA |
-|----------|-----------|----------|----|
-| Preparación (#1) | Axel Cisnero | Angel Martinez | Integrante 3 |
-| HU-5 (#6) | Axel Cisnero | Angel Martinez | Integrante 3 |
-| HU-4 (#5) | Angel Martinez | Integrante 3 | Axel Cisnero |
-| HU-1 (#2) | Integrante 3 | Axel Cisnero | Angel Martinez |
-| HU-2 (#3) | Axel Cisnero | Integrante 3 | Angel Martinez |
-| HU-3 (#4) | Angel Martinez | Axel Cisnero | Integrante 3 |
+**Developer:** Axel Cisnero, en todas las historias, con agentes de IA (ver `AI_LOG.md`).
+**Reviewer y QA:** rotan entre Angel Martinez y Angel Del Biondo en cada historia.
+Además, cada PR tuvo una revisión de un agente IA independiente que no participó en el desarrollo.
+
+| Historia | PR | Developer | Reviewer | QA |
+|----------|----|-----------|----------|----|
+| Preparación (#1) | #7 | Axel Cisnero | Angel Martinez | Angel Del Biondo |
+| HU-5 (#6) | #8 | Axel Cisnero | Angel Del Biondo | Angel Martinez |
+| HU-4 (#5) | #9 | Axel Cisnero | Angel Martinez | Angel Del Biondo |
+| HU-1 (#2) | #10 | Axel Cisnero | Angel Del Biondo | Angel Martinez |
+| HU-2 (#3) | #11 | Axel Cisnero | Angel Martinez | Angel Del Biondo |
+| HU-3 (#4) | #12 | Axel Cisnero | Angel Del Biondo | Angel Martinez |
 
 ## Reglas
 
