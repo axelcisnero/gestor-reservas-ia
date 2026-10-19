@@ -10,6 +10,7 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
     path('mis-reservas/', views.mis_reservas, name='mis_reservas'),
+    path('mi-cuenta/pago/', views.mi_metodo_pago, name='mi_metodo_pago'),
     path('mis-reservas/<int:booking_id>/cancelar/', views.cancelar_reserva, name='cancelar_reserva'),
 
 

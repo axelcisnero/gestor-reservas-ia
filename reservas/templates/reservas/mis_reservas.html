@@ -11,6 +11,7 @@
         <a href="/" class="text-xl font-bold">Gestor de Reservas</a>
         <div>
             <span class="mr-4">Hola, {{ user.username }}</span>
+            <a href="{% url 'mi_metodo_pago' %}" class="mr-4 underline">Mi método de pago</a>
             <a href="{% url 'logout' %}" class="bg-red-500 px-3 py-1 rounded hover:bg-red-600">Cerrar Sesión</a>
         </div>
     </nav>
@@ -27,7 +28,7 @@
             {% if proximas %}
             <table class="w-full text-left">
                 <thead><tr class="text-gray-500 text-sm border-b">
-                    <th class="py-2">Recurso</th><th>Fecha</th><th>Hora</th><th></th>
+                    <th class="py-2">Recurso</th><th>Fecha</th><th>Hora</th><th>Monto</th><th></th>
                 </tr></thead>
                 <tbody>
                 {% for r in proximas %}
@@ -35,6 +36,7 @@
                     <td class="py-2">{{ r.resource.name }}</td>
                     <td>{{ r.start_time|date:"d/m/Y" }}</td>
                     <td>{{ r.start_time|time:"H:i" }} – {{ r.end_time|time:"H:i" }}</td>
+                    <td>{% if r.amount %}${{ r.amount }}{% else %}Gratis{% endif %}</td>
                     <td class="text-right">
                         <form method="post" action="{% url 'cancelar_reserva' r.id %}" class="form-cancelar"
                               data-confirmacion="¿Cancelar la reserva de {{ r.resource.name }} el {{ r.start_time|date:'d/m/Y H:i' }}?">

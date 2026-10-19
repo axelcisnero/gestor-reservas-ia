@@ -16,7 +16,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS("Usuario demo_user creado."))
 
         # Crear un recurso demo si no existe
-        recurso, creado = Resource.objects.get_or_create(name='Pista Pádel 1', defaults={'description': 'Pista de pádel exterior'})
+        recurso, creado = Resource.objects.get_or_create(name='Pista Pádel 1', defaults={'description': 'Pista de pádel exterior', 'price_per_hour': 15})
         if creado:
             self.stdout.write(self.style.SUCCESS("Recurso Pista Pádel 1 creado."))
 
