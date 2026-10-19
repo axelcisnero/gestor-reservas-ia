@@ -14,6 +14,9 @@ Herramientas: **Claude** (agente de escritorio, Claude app / Claude Code) y **Gi
 | 7 | 2026-10-19 | Revisión HU-4 | Claude (agente revisor independiente) | Revisar el diff del PR #9 | 4 hallazgos: **XSS** en `confirm()`, login ignoraba `?next=`, pruebas incompletas, enlace escrito a mano | **4 corregidos** en el mismo PR |
 | 8 | 2026-10-19 | Código HU-1 | Claude (desarrollador) | Pago simulado con datos guardados | Modelos `PaymentProfile`, `pagos.py` (Luhn, marca, vencimiento, CVV), checkout en el calendario, 15 pruebas | **Modificado**: token con valor fijo detectado en revisión humana de la migración |
 | 9 | 2026-10-19 | Revisión HU-1 | Claude (agente revisor independiente) | Revisar el diff del PR #10 (seguridad, XSS, montos, atomicidad, JS) | 4 hallazgos: recursos gratis sin botón para confirmar, tarjeta y CVV visibles en la página de error 500, titular sin límite de largo, diferencia de 1 centavo en el monto mostrado | **3 corregidos, 1 rechazado** (el del centavo) |
+| 10 | 2026-10-19 | Código HU-2 | Claude (desarrollador) | Calendario mensual con días libres/parciales/completos/bloqueados | `disponibilidad.py` (unión de intervalos), endpoint JSON, vista mensual con colores y leyenda, 13 pruebas | **Modificado** tras la prueba manual en navegador (entrada 11) |
+| 11 | 2026-10-19 | QA HU-2 | Navegador automatizado (Playwright) dirigido por Claude | Probar el calendario como usuario real | Las pruebas unitarias pasaban, pero: clic sobre un día lleno de reservas no avisaba, bloqueos se veían como "0", se mostraba el usuario de cada reserva y el idioma español nunca cargaba | **4 corregidos** antes de abrir el PR |
+| 12 | 2026-10-19 | Revisión HU-2 | Claude (agente revisor independiente) | Revisar el diff del PR #11 (zonas horarias, bordes, rendimiento, JS) | 4 hallazgos: error 500 con fechas extremas, "hoy" contaba horas ya pasadas, día equivocado si el navegador está en otra zona horaria, pruebas faltantes | **4 corregidos**; verificó que el endpoint hace solo 2 consultas |
 
 ## Respuestas incorrectas de la IA
 
@@ -30,6 +33,11 @@ Herramientas: **Claude** (agente de escritorio, Claude app / Claude Code) y **Gi
 7. **Fuga de datos sensibles:** si llegaba `titular` como número, `.strip()` daba error 500 y la página de error mostraba el número de tarjeta y el CVV. Se validan los tipos y se marcaron `@sensitive_variables` en la vista, el servicio y el módulo de pagos.
 8. **Afirmación incorrecta del revisor IA:** dijo que `@sensitive_variables` ocultaría la tarjeta en la página de error con `DEBUG=True`. **Es falso**: Django solo filtra cuando `DEBUG=False`, porque esa página es de desarrollo y muestra todo a propósito. Lo comprobamos ejecutándolo. `DEBUG` ahora se controla con la variable `DJANGO_DEBUG`.
 9. **Prueba que no probaba nada:** la primera prueba de la IA para ese filtro revisaba el correo de error en texto plano, que no incluye variables locales. Pasaba **incluso quitando los decoradores**. Lo detectamos al hacer esa prueba de mutación. Se reescribió con `ExceptionReporter`: ahora pasa con los decoradores y falla sin ellos.
+
+10. **HU-2: la IA solo manejó `dateClick`.** En la vista mensual, si el día está lleno de reservas el clic cae sobre un evento y `dateClick` no se dispara, así que el aviso "día completo" nunca salía. Las 13 pruebas unitarias estaban en verde. Lo detectó la prueba en navegador. Se agregaron `eventClick` y `dayMaxEvents`.
+11. **Problemas heredados del proyecto original que la IA no vio al analizarlo:** `locale: 'es'` no tenía efecto porque faltaba el archivo de idioma, los bloqueos no tenían título (se veía "0") y la API exponía el nombre de usuario de cada reserva a cualquier visitante. Se corrigieron en HU-2: ahora se muestra "Ocupado" o "Tu reserva".
+
+12. **HU-2: el día de hoy contaba las horas que ya pasaron.** A las 15:00, si quedaban reservadas las horas de 15 a 21, el día salía "parcial". El usuario entraba y no podía elegir nada: justo el "intento fallido" que la historia quiere evitar. Las pruebas de la IA usaban días futuros y no lo cubrían. Corregido y probado simulando la hora.
 
 ## Cambios de la IA rechazados
 

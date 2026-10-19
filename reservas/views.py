@@ -14,6 +14,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from .models import Resource, Booking, Availability, PaymentProfile
 from .pagos import perfil_vigente
+from .disponibilidad import COLORES, disponibilidad_por_dia
 from .services import ReservaError, crear_reservas
 
 
@@ -99,7 +100,7 @@ def calendario_full(request, resource_id):
         {
             "start": reserva.start_time.isoformat(),
             "end": reserva.end_time.isoformat(),
-            "title": f"Reservado por {reserva.user.username}",
+            "title": "Ocupado",
             "color": "#10b981",  # Verde reservas
         }
         for reserva in reservas
@@ -108,6 +109,7 @@ def calendario_full(request, resource_id):
     # Lista de bloqueos (rojo)
     bloqueos_json = [
         {
+            "title": "Bloqueado",
             "start": bloqueo.start_time.isoformat(),
             "end": bloqueo.end_time.isoformat(),
         }
@@ -185,14 +187,15 @@ def logout_view(request):
 def api_reservas(request, resource_id):
     """
     API que devuelve todas las reservas de un recurso en formato JSON.
+    HU-2: no expone el nombre de otros usuarios; solo "Ocupado" o "Tu reserva".
     """
     reservas = Booking.objects.filter(resource_id=resource_id).order_by('start_time')
     eventos = [
         {
-            "title": f"Reservado por {reserva.user.username}",
+            "title": "Tu reserva" if reserva.user_id == request.user.id else "Ocupado",
             "start": reserva.start_time.isoformat(),
             "end": reserva.end_time.isoformat(),
-            "color": "#10b981",  # Verde
+            "color": "#2563eb" if reserva.user_id == request.user.id else "#10b981",
         }
         for reserva in reservas
     ]
@@ -243,3 +246,30 @@ def mi_metodo_pago(request):
         messages.success(request, "Se eliminó tu método de pago guardado.")
         return redirect('mi_metodo_pago')
     return render(request, 'reservas/mi_metodo_pago.html', {'perfil': perfil})
+
+
+def api_disponibilidad(request, resource_id):
+    """HU-2: estado de cada día para colorear el calendario (eventos de fondo de FullCalendar).
+
+    Parámetros GET `start` y `end` (fecha o fecha-hora ISO, como los envía FullCalendar).
+    """
+    resource = get_object_or_404(Resource, id=resource_id)
+    try:
+        desde = datetime.fromisoformat(request.GET['start'][:10]).date()
+        hasta = datetime.fromisoformat(request.GET['end'][:10]).date()
+    except (KeyError, ValueError):
+        return JsonResponse({'error': 'Parámetros start y end requeridos (AAAA-MM-DD).'}, status=400)
+    if hasta <= desde:
+        return JsonResponse({'error': 'end debe ser posterior a start.'}, status=400)
+    hoy = timezone.localdate()
+    if not (hoy - timedelta(days=730) <= desde <= hoy + timedelta(days=730)):
+        return JsonResponse({'error': 'Rango de fechas fuera de lo permitido (±2 años).'}, status=400)
+    eventos = []
+    for d in disponibilidad_por_dia(resource, desde, hasta):
+        fin = (datetime.fromisoformat(d['fecha']) + timedelta(days=1)).date().isoformat()
+        eventos.append({
+            'start': d['fecha'], 'end': fin, 'allDay': True, 'display': 'background',
+            'color': COLORES[d['estado']],
+            'extendedProps': d,
+        })
+    return JsonResponse(eventos, safe=False)
