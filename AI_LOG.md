@@ -17,6 +17,7 @@ Herramientas: **Claude** (agente de escritorio, Claude app / Claude Code) y **Gi
 | 10 | 2026-10-19 | Código HU-2 | Claude (desarrollador) | Calendario mensual con días libres/parciales/completos/bloqueados | `disponibilidad.py` (unión de intervalos), endpoint JSON, vista mensual con colores y leyenda, 13 pruebas | **Modificado** tras la prueba manual en navegador (entrada 11) |
 | 11 | 2026-10-19 | QA HU-2 | Navegador automatizado (Playwright) dirigido por Claude | Probar el calendario como usuario real | Las pruebas unitarias pasaban, pero: clic sobre un día lleno de reservas no avisaba, bloqueos se veían como "0", se mostraba el usuario de cada reserva y el idioma español nunca cargaba | **4 corregidos** antes de abrir el PR |
 | 12 | 2026-10-19 | Revisión HU-2 | Claude (agente revisor independiente) | Revisar el diff del PR #11 (zonas horarias, bordes, rendimiento, JS) | 4 hallazgos: error 500 con fechas extremas, "hoy" contaba horas ya pasadas, día equivocado si el navegador está en otra zona horaria, pruebas faltantes | **4 corregidos**; verificó que el endpoint hace solo 2 consultas |
+| 13 | 2026-10-19 | Código HU-3 | Claude (desarrollador) | Previsión de demanda para el administrador | `prevision.py` (horas por semana, regresión lineal, ocupación, sugerencia de precio), panel con Chart.js solo para staff, comando `generar_historico_demo`, 10 pruebas | **Aceptado parcialmente** (ver decisiones) |
 
 ## Respuestas incorrectas de la IA
 
@@ -52,4 +53,7 @@ Herramientas: **Claude** (agente de escritorio, Claude app / Claude Code) y **Gi
 - HU-5: las fechas sin zona horaria se **aceptan** interpretándolas en America/Panama (el revisor también ofrecía rechazarlas; elegimos aceptarlas para no romper clientes de la API).
 - HU-1: los recursos con precio 0 son gratuitos y no piden pago, para no romper el comportamiento original.
 - HU-1: "Guardar mis datos" viene marcado por defecto, pero el usuario puede desmarcarlo y eliminar su método guardado en cualquier momento.
+- HU-3: se eligió **regresión lineal** en lugar de un modelo de series de tiempo (ARIMA/Prophet) que también se consideró: es explicable en la presentación, no agrega dependencias pesadas y basta con 12 semanas de datos.
+- HU-3: umbrales de negocio definidos por el equipo: subir el precio 10 % si la ocupación prevista es ≥ 75 %, bajarlo 10 % si es ≤ 30 % y sugerir otro recurso si es ≥ 90 %. El sistema **sugiere**; el administrador decide.
+- HU-3: la semana en curso no cuenta como histórico porque está incompleta y bajaría la tendencia.
 - HU-5: la concurrencia real en SQLite queda como **limitación conocida**; en producción se usaría PostgreSQL. No se agrega una restricción de exclusión en la BD por alcance del sprint.

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Previsión de demanda - Gestor de Reservas</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.js"></script>
+</head>
+<body class="bg-gray-100">
+    <nav class="bg-blue-600 text-white p-4 flex justify-between items-center">
+        <a href="/" class="text-xl font-bold">Gestor de Reservas</a>
+        <div>
+            <a href="/admin/" class="mr-4 underline">Administración</a>
+            <a href="{% url 'logout' %}" class="bg-red-500 px-3 py-1 rounded hover:bg-red-600">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="max-w-6xl mx-auto mt-8 px-4 pb-12">
+        <h2 class="text-2xl font-bold">Previsión de demanda</h2>
+        <p class="text-gray-600 mb-6">Horas reservadas por semana en las últimas {{ semanas_historico }} semanas y previsión de las próximas {{ semanas_prevision }}
+            (regresión lineal sobre el histórico). Capacidad: 84 h por semana (12 h × 7 días).</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            {% for p in previsiones %}
+            <div class="bg-white rounded-lg shadow p-4 border-t-4 {% if p.sugerencia.accion == 'subir' %}border-red-500{% elif p.sugerencia.accion == 'bajar' %}border-yellow-500{% else %}border-green-500{% endif %}">
+                <h3 class="font-semibold text-lg">{{ p.recurso.name }}</h3>
+                <p class="text-3xl font-bold my-2">{{ p.ocupacion }} %</p>
+                <p class="text-sm text-gray-500">ocupación prevista · tendencia {% if p.tendencia >= 0 %}+{% endif %}{{ p.tendencia }} h/semana</p>
+                <p class="mt-3">{{ p.sugerencia.texto }}</p>
+                <p class="text-sm text-gray-600">Precio actual ${{ p.recurso.price_per_hour }} → sugerido <strong>${{ p.sugerencia.precio_sugerido }}</strong></p>
+            </div>
+            {% empty %}
+            <p class="text-gray-500">No hay recursos.</p>
+            {% endfor %}
+        </div>
+
+        {% for g in graficos %}
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <h3 class="font-semibold mb-2">{{ g.nombre }}</h3>
+            <canvas id="grafico-{{ g.id }}" height="90"></canvas>
+        </div>
+        {% endfor %}
+    </div>
+
+    {{ graficos|json_script:"datos-graficos" }}
+    <script>
+        const graficos = JSON.parse(document.getElementById('datos-graficos').textContent);
+        graficos.forEach(g => {
+            const n = g.historico.length;
+            // la previsión arranca en el último punto real para que la línea sea continua
+            const prevision = Array(n - 1).fill(null).concat([g.historico[n - 1]], g.prevision);
+            new Chart(document.getElementById('grafico-' + g.id), {
+                type: 'line',
+                data: {
+                    labels: g.etiquetas,
+                    datasets: [
+                        { label: 'Histórico (h/semana)', data: g.historico, borderColor: '#2563eb', backgroundColor: '#2563eb', tension: .25 },
+                        { label: 'Previsión', data: prevision, borderColor: '#f59e0b', backgroundColor: '#f59e0b', borderDash: [6, 4], tension: .25 },
+                    ]
+                },
+                options: {
+                    scales: { y: { beginAtZero: true, suggestedMax: 84, title: { display: true, text: 'Horas reservadas' } },
+                              x: { title: { display: true, text: 'Semana (lunes)' } } },
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

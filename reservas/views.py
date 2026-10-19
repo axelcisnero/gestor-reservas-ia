@@ -15,6 +15,8 @@ from django.contrib import messages
 from .models import Resource, Booking, Availability, PaymentProfile
 from .pagos import perfil_vigente
 from .disponibilidad import COLORES, disponibilidad_por_dia
+from .prevision import SEMANAS_HISTORICO, SEMANAS_PREVISION, prevision_recurso
+from django.contrib.admin.views.decorators import staff_member_required
 from .services import ReservaError, crear_reservas
 
 
@@ -273,3 +275,19 @@ def api_disponibilidad(request, resource_id):
             'extendedProps': d,
         })
     return JsonResponse(eventos, safe=False)
+
+
+@staff_member_required
+def panel_prevision(request):
+    """HU-3: previsión de demanda por recurso (solo personal administrador)."""
+    previsiones = [prevision_recurso(r) for r in Resource.objects.order_by('name')]
+    graficos = [{
+        'id': p['recurso'].id, 'nombre': p['recurso'].name,
+        'etiquetas': p['etiquetas'], 'historico': p['historico'], 'prevision': p['prevision'],
+    } for p in previsiones]
+    return render(request, 'reservas/prevision.html', {
+        'previsiones': previsiones,
+        'graficos': graficos,
+        'semanas_historico': SEMANAS_HISTORICO,
+        'semanas_prevision': SEMANAS_PREVISION,
+    })
