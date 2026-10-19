@@ -2,13 +2,14 @@ import json
 from datetime import datetime, timedelta, time
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.http import require_POST
 from django.utils.dateformat import format as date_format
 from django.utils.dateparse import parse_datetime
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from .models import Resource, Booking, Availability
-from .models import Resource
+from .services import ReservaError, crear_reservas
 
 
 # Horario por defecto (si no hay Availability definida)
@@ -78,6 +79,7 @@ def calendario_navegable(request, resource_id):
     })
 
 
+@ensure_csrf_cookie
 def calendario_full(request, resource_id):
     """
     Calendario interactivo con FullCalendar.
@@ -116,53 +118,31 @@ def calendario_full(request, resource_id):
 
 
 
-@csrf_exempt
+@require_POST
 def api_crear_reserva(request):
     """
-    Endpoint para crear una nueva reserva, con soporte para repeticiones semanales.
+    Crea una reserva con repeticiones semanales opcionales.
+    HU-5: todas las semanas se validan antes de guardar y se crean en una sola transacción.
     """
-    if request.method == 'POST':
-        if not request.user.is_authenticated:
-            return JsonResponse({'success': False, 'error': 'Debes iniciar sesión para reservar.'}, status=403)
-        try:
-            data = json.loads(request.body)
-            resource_id = data.get('resource_id')
-            start_time = parse_datetime(data.get('start_time'))
-            end_time = parse_datetime(data.get('end_time'))
-            repeat_weeks = int(data.get('repeat_weeks', 0))
-
-            reservas_creadas = []
-
-            for i in range(repeat_weeks + 1):
-                start = start_time + timedelta(weeks=i)
-                end = end_time + timedelta(weeks=i)
-
-                overlapping = Booking.objects.filter(
-                    resource_id=resource_id,
-                    start_time__lt=end,
-                    end_time__gt=start
-                )
-                if overlapping.exists():
-                    return JsonResponse({
-                        'success': False,
-                        'error': f'Conflicto: hay una reserva en la semana {i + 1} ({start}).'
-                    })
-
-                booking = Booking.objects.create(
-                    user=request.user,
-                    resource_id=resource_id,
-                    start_time=start,
-                    end_time=end
-                )
-                reservas_creadas.append({
-                    'start': start.isoformat(),
-                    'end': end.isoformat()
-                })
-
-            return JsonResponse({'success': True, 'reservas': reservas_creadas})
-        except Exception as e:
-            return JsonResponse({'success': False, 'error': str(e)})
-    return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
+    if not request.user.is_authenticated:
+        return JsonResponse({'success': False, 'error': 'Debes iniciar sesión para reservar.'}, status=403)
+    try:
+        data = json.loads(request.body)
+        if not isinstance(data, dict):
+            raise ValueError("Se esperaba un objeto JSON")
+        repeat_weeks = int(data.get('repeat_weeks', 0) or 0)
+        inicio = parse_datetime(data.get('start_time') or '')
+        fin = parse_datetime(data.get('end_time') or '')
+    except (ValueError, TypeError):
+        return JsonResponse({'success': False, 'error': 'Datos de la reserva inválidos.'}, status=400)
+    try:
+        reservas = crear_reservas(request.user, data.get('resource_id'), inicio, fin, repeat_weeks)
+    except ReservaError as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    return JsonResponse({
+        'success': True,
+        'reservas': [{'start': r.start_time.isoformat(), 'end': r.end_time.isoformat()} for r in reservas],
+    })
 
 
 def login_view(request):

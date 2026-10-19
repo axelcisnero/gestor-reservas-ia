@@ -231,7 +231,15 @@
                         repeat_weeks: repeat
                     })
                 })
-                .then(response => response.json())
+                .then(async response => {
+                    const tipo = response.headers.get('content-type') || '';
+                    if (!tipo.includes('application/json')) {
+                        throw new Error(response.status === 403
+                            ? 'Tu sesión expiró o falta el token de seguridad. Recarga la página.'
+                            : `Error del servidor (${response.status}).`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     if (data.success) {
                         alert(`Reserva(s) creada(s) correctamente: ${data.reservas.length} reserva(s).`);
@@ -240,7 +248,7 @@
                         alert(data.error || 'Error al crear la reserva.');
                     }
                 })
-                .catch(error => console.error('Error:', error));
+                .catch(error => { console.error('Error:', error); alert(error.message); });
             }
 
             // Función para obtener CSRF
