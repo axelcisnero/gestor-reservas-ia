@@ -10,6 +10,8 @@ Herramientas: **Claude** (agente de escritorio, Claude app / Claude Code) y **Gi
 | 3 | 2026-10-19 | Planificación | Claude | Proponer 2 historias adicionales | HU-4 (ver/cancelar mis reservas) y HU-5 (recurrentes todo o nada) | **Aceptada** por el equipo |
 | 4 | 2026-10-19 | Código HU-5 | Claude (desarrollador) | Hacer atómicas las reservas recurrentes y validar en el servidor | `services.crear_reservas()` + 10 pruebas que fallan 10/10 contra el código original | **Aceptado tras revisión** (ver entrada 5) |
 | 5 | 2026-10-19 | Revisión HU-5 | Claude (agente revisor independiente, no vio el desarrollo) | Revisar el diff del PR #8 contra los criterios de aceptación | 5 hallazgos: 2 errores 500, 1 comentario falso, 1 problema de UX, 2 pruebas faltantes | **4 corregidos** en el mismo PR; la concurrencia en SQLite se documentó como limitación |
+| 6 | 2026-10-19 | Código HU-4 | Claude (desarrollador) | Página Mis reservas y cancelación | Vista, plantilla y 6 pruebas | **Modificado** tras revisión (entrada 7) |
+| 7 | 2026-10-19 | Revisión HU-4 | Claude (agente revisor independiente) | Revisar el diff del PR #9 | 4 hallazgos: **XSS** en `confirm()`, login ignoraba `?next=`, pruebas incompletas, enlace escrito a mano | **4 corregidos** en el mismo PR |
 
 ## Respuestas incorrectas de la IA
 
@@ -17,6 +19,8 @@ Herramientas: **Claude** (agente de escritorio, Claude app / Claude Code) y **Gi
 
 2. **HU-5 devolvía error 500 en dos casos** que la IA desarrolladora no consideró: fechas sin zona horaria (`TypeError` al comparar con `timezone.now()`) y un cuerpo JSON que no es objeto (`[]` → `AttributeError`). Lo detectó el agente revisor reproduciéndolo; se agregaron pruebas.
 3. **Comentario falso en el código:** la IA escribió que `select_for_update()` evita reservas simultáneas, pero **SQLite lo ignora**. Se corrigió el comentario y se documentó la limitación.
+
+4. **XSS introducido por la IA (HU-4).** La IA desarrolladora metió el nombre del recurso dentro de `onsubmit="return confirm('...')"`. El autoescape de Django no protege ahí: el navegador decodifica `&#x27;` antes de ejecutar el JS. Un recurso llamado `x');alert(1);('` ejecutaba código. Se movió el texto a un atributo `data-*` y se agregó una prueba.
 
 ## Cambios de la IA rechazados
 

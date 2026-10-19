@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis reservas - Gestor de Reservas</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <nav class="bg-blue-600 text-white p-4 flex justify-between items-center">
+        <a href="/" class="text-xl font-bold">Gestor de Reservas</a>
+        <div>
+            <span class="mr-4">Hola, {{ user.username }}</span>
+            <a href="{% url 'logout' %}" class="bg-red-500 px-3 py-1 rounded hover:bg-red-600">Cerrar Sesión</a>
+        </div>
+    </nav>
+
+    <div class="max-w-4xl mx-auto mt-8 px-4">
+        <h2 class="text-2xl font-bold mb-4">Mis reservas</h2>
+
+        {% for m in messages %}
+        <div class="mb-4 p-3 rounded {% if m.tags == 'error' %}bg-red-100 text-red-800{% else %}bg-green-100 text-green-800{% endif %}">{{ m }}</div>
+        {% endfor %}
+
+        <div class="bg-white rounded-lg shadow p-4 mb-8">
+            <h3 class="font-semibold mb-3">Próximas</h3>
+            {% if proximas %}
+            <table class="w-full text-left">
+                <thead><tr class="text-gray-500 text-sm border-b">
+                    <th class="py-2">Recurso</th><th>Fecha</th><th>Hora</th><th></th>
+                </tr></thead>
+                <tbody>
+                {% for r in proximas %}
+                <tr class="border-b">
+                    <td class="py-2">{{ r.resource.name }}</td>
+                    <td>{{ r.start_time|date:"d/m/Y" }}</td>
+                    <td>{{ r.start_time|time:"H:i" }} – {{ r.end_time|time:"H:i" }}</td>
+                    <td class="text-right">
+                        <form method="post" action="{% url 'cancelar_reserva' r.id %}" class="form-cancelar"
+                              data-confirmacion="¿Cancelar la reserva de {{ r.resource.name }} el {{ r.start_time|date:'d/m/Y H:i' }}?">
+                            {% csrf_token %}
+                            <button class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Cancelar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="text-gray-500">No tienes reservas próximas. <a class="text-blue-600 underline" href="/">Reservar ahora</a></p>
+            {% endif %}
+        </div>
+
+        {% if pasadas %}
+        <div class="bg-white rounded-lg shadow p-4">
+            <h3 class="font-semibold mb-3 text-gray-600">Historial reciente</h3>
+            <ul class="text-gray-600">
+                {% for r in pasadas %}<li>{{ r.resource.name }} · {{ r.start_time|date:"d/m/Y H:i" }}</li>{% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+    <script>
+        // El texto viaja en un atributo data-* (escapado por Django) y no dentro de código JS.
+        document.querySelectorAll('.form-cancelar').forEach(function (f) {
+            f.addEventListener('submit', function (e) {
+                if (!confirm(f.dataset.confirmacion)) e.preventDefault();
+            });
+        });
+    </script>
+</body>
+</html>

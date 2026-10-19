@@ -1,6 +1,9 @@
 import json
 from datetime import datetime, timedelta, time
 from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.http import JsonResponse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
@@ -155,7 +158,11 @@ def login_view(request):
         user = authenticate(request, username=username, password=password)
         if user:
             login(request, user)
-            return redirect('/')
+            # Volver a la página que pidió el login (?next=), solo si es de este sitio.
+            siguiente = request.POST.get('next') or request.GET.get('next') or '/'
+            if not url_has_allowed_host_and_scheme(siguiente, allowed_hosts={request.get_host()}):
+                siguiente = '/'
+            return redirect(siguiente)
         else:
             messages.error(request, "Usuario o contraseña incorrectos.")
     return render(request, 'reservas/login.html')
@@ -192,3 +199,29 @@ def home(request):
     return render(request, 'reservas/home.html', {'resources': resources})
 
 
+
+
+@login_required
+def mis_reservas(request):
+    """HU-4: lista las próximas reservas del usuario y su historial reciente."""
+    ahora = timezone.now()
+    reservas = Booking.objects.filter(user=request.user).select_related('resource')
+    return render(request, 'reservas/mis_reservas.html', {
+        'proximas': reservas.filter(start_time__gte=ahora).order_by('start_time'),
+        'pasadas': reservas.filter(start_time__lt=ahora).order_by('-start_time')[:10],
+    })
+
+
+@login_required
+@require_POST
+def cancelar_reserva(request, booking_id):
+    """HU-4: cancela una reserva futura del propio usuario."""
+    # Filtrar por usuario: una reserva ajena responde 404 (no revela que existe).
+    reserva = get_object_or_404(Booking, pk=booking_id, user=request.user)
+    if reserva.start_time <= timezone.now():
+        messages.error(request, "No se puede cancelar una reserva que ya empezó o pasó.")
+    else:
+        texto = f"{reserva.resource.name} el {timezone.localtime(reserva.start_time):%d/%m/%Y %H:%M}"
+        reserva.delete()
+        messages.success(request, f"Reserva cancelada: {texto}. El horario quedó libre.")
+    return redirect('mis_reservas')

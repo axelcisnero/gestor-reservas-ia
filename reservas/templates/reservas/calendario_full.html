@@ -79,6 +79,10 @@
             background: #059669;
         }
 
+        .btn-mis-reservas {
+            background: #1e40af;
+        }
+
         .btn-logout {
             background: #ef4444; /* Rojo logout */
         }
@@ -101,6 +105,7 @@
         </div>
         <div class="nav-right">
             {% if is_authenticated %}
+                <a href="{% url 'mis_reservas' %}" class="btn-mis-reservas">Mis reservas</a>
                 <span class="user-info">Hola, {{ user.username }}</span>
                 <a href="/logout/" class="btn-logout">Cerrar Sesión</a>
             {% else %}
