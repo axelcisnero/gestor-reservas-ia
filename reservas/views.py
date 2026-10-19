@@ -261,6 +261,9 @@ def api_disponibilidad(request, resource_id):
         return JsonResponse({'error': 'Parámetros start y end requeridos (AAAA-MM-DD).'}, status=400)
     if hasta <= desde:
         return JsonResponse({'error': 'end debe ser posterior a start.'}, status=400)
+    hoy = timezone.localdate()
+    if not (hoy - timedelta(days=730) <= desde <= hoy + timedelta(days=730)):
+        return JsonResponse({'error': 'Rango de fechas fuera de lo permitido (±2 años).'}, status=400)
     eventos = []
     for d in disponibilidad_por_dia(resource, desde, hasta):
         fin = (datetime.fromisoformat(d['fecha']) + timedelta(days=1)).date().isoformat()

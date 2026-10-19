@@ -16,6 +16,7 @@ Herramientas: **Claude** (agente de escritorio, Claude app / Claude Code) y **Gi
 | 9 | 2026-10-19 | Revisión HU-1 | Claude (agente revisor independiente) | Revisar el diff del PR #10 (seguridad, XSS, montos, atomicidad, JS) | 4 hallazgos: recursos gratis sin botón para confirmar, tarjeta y CVV visibles en la página de error 500, titular sin límite de largo, diferencia de 1 centavo en el monto mostrado | **3 corregidos, 1 rechazado** (el del centavo) |
 | 10 | 2026-10-19 | Código HU-2 | Claude (desarrollador) | Calendario mensual con días libres/parciales/completos/bloqueados | `disponibilidad.py` (unión de intervalos), endpoint JSON, vista mensual con colores y leyenda, 13 pruebas | **Modificado** tras la prueba manual en navegador (entrada 11) |
 | 11 | 2026-10-19 | QA HU-2 | Navegador automatizado (Playwright) dirigido por Claude | Probar el calendario como usuario real | Las pruebas unitarias pasaban, pero: clic sobre un día lleno de reservas no avisaba, bloqueos se veían como "0", se mostraba el usuario de cada reserva y el idioma español nunca cargaba | **4 corregidos** antes de abrir el PR |
+| 12 | 2026-10-19 | Revisión HU-2 | Claude (agente revisor independiente) | Revisar el diff del PR #11 (zonas horarias, bordes, rendimiento, JS) | 4 hallazgos: error 500 con fechas extremas, "hoy" contaba horas ya pasadas, día equivocado si el navegador está en otra zona horaria, pruebas faltantes | **4 corregidos**; verificó que el endpoint hace solo 2 consultas |
 
 ## Respuestas incorrectas de la IA
 
@@ -35,6 +36,8 @@ Herramientas: **Claude** (agente de escritorio, Claude app / Claude Code) y **Gi
 
 10. **HU-2: la IA solo manejó `dateClick`.** En la vista mensual, si el día está lleno de reservas el clic cae sobre un evento y `dateClick` no se dispara, así que el aviso "día completo" nunca salía. Las 13 pruebas unitarias estaban en verde. Lo detectó la prueba en navegador. Se agregaron `eventClick` y `dayMaxEvents`.
 11. **Problemas heredados del proyecto original que la IA no vio al analizarlo:** `locale: 'es'` no tenía efecto porque faltaba el archivo de idioma, los bloqueos no tenían título (se veía "0") y la API exponía el nombre de usuario de cada reserva a cualquier visitante. Se corrigieron en HU-2: ahora se muestra "Ocupado" o "Tu reserva".
+
+12. **HU-2: el día de hoy contaba las horas que ya pasaron.** A las 15:00, si quedaban reservadas las horas de 15 a 21, el día salía "parcial". El usuario entraba y no podía elegir nada: justo el "intento fallido" que la historia quiere evitar. Las pruebas de la IA usaban días futuros y no lo cubrían. Corregido y probado simulando la hora.
 
 ## Cambios de la IA rechazados
 

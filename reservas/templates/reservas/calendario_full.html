@@ -245,6 +245,11 @@
                 pasado: 'No se puede reservar en días pasados.'
             };
 
+            // Fecha AAAA-MM-DD en la misma zona en que se dibujan las celdas (evita startStr con otra zona)
+            function fechaLocal(d) {
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            }
+
             function abrirDia(fecha) {
                 const estado = estadoPorDia[fecha];
                 if (textoEstado[estado]) { alert(textoEstado[estado]); return; }
@@ -267,11 +272,10 @@
                 eventClick: function(info) {
                     if (calendar.view.type !== 'dayGridMonth' || info.event.display === 'background') return;
                     info.jsEvent.preventDefault();
-                    abrirDia(info.event.startStr.slice(0, 10));
+                    abrirDia(fechaLocal(info.event.start));
                 },
                 dayCellClassNames: arg => {
-                    const y = arg.date.getFullYear(), m = String(arg.date.getMonth() + 1).padStart(2, '0'), d = String(arg.date.getDate()).padStart(2, '0');
-                    const estado = estadoPorDia[`${y}-${m}-${d}`];
+                    const estado = estadoPorDia[fechaLocal(arg.date)];
                     return estado ? ['dia-' + estado] : [];
                 },
                 slotMinTime: "09:00:00", // Horario inicial

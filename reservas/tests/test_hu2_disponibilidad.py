@@ -105,3 +105,40 @@ class PrivacidadCalendarioTests(BaseCase):
         self.assertEqual(titulos, ["Ocupado", "Tu reserva"])
         r = self.client.get(reverse("calendario_full", args=[self.pista.id]))
         self.assertNotContains(r, "beto")
+
+
+class HallazgosRevisionHU2Tests(BaseCase):
+    """Casos agregados tras la revisión del PR #11 (ver AI_LOG.md)."""
+
+    def test_fechas_extremas_dan_400(self):
+        url = reverse("api_disponibilidad", args=[self.pista.id])
+        self.assertEqual(self.client.get(url, {"start": "9999-12-30", "end": "9999-12-31"}).status_code, 400)
+        self.assertEqual(self.client.get(url, {"start": "0001-01-01", "end": "0001-01-05"}).status_code, 400)
+        self.assertEqual(self.client.get(url, {"start": "no-es-fecha", "end": "2026-01-01"}).status_code, 400)
+
+    def test_hoy_solo_cuenta_horas_futuras(self):
+        from unittest import mock
+        hoy = timezone.localdate()
+        a_las_15 = en(hoy, 15)
+        # 15:00-21:00 reservado; a las 15:00 ya no queda nada libre -> completo (antes salía "parcial")
+        Booking.objects.create(user=self.user, resource=self.pista, start_time=en(hoy, 15), end_time=en(hoy, 21))
+        with mock.patch("django.utils.timezone.now", return_value=a_las_15):
+            e = disponibilidad_por_dia(self.pista, hoy, hoy + timedelta(days=1))[0]
+        self.assertEqual(e["estado"], "completo")
+
+    def test_hoy_despues_del_cierre_es_pasado(self):
+        from unittest import mock
+        hoy = timezone.localdate()
+        with mock.patch("django.utils.timezone.now", return_value=en(hoy, 22)):
+            e = disponibilidad_por_dia(self.pista, hoy, hoy + timedelta(days=1))[0]
+        self.assertEqual(e["estado"], "pasado")
+
+    def test_reserva_que_cruza_medianoche(self):
+        d = timezone.localdate() + timedelta(days=4)
+        Booking.objects.create(user=self.user, resource=self.pista, start_time=en(d, 20), end_time=en(d + timedelta(days=1), 10))
+        dias = disponibilidad_por_dia(self.pista, d, d + timedelta(days=2))
+        self.assertEqual([x["horas_ocupadas"] for x in dias], [1, 1])
+
+    def test_rango_limitado_a_62_dias(self):
+        d = timezone.localdate()
+        self.assertEqual(len(disponibilidad_por_dia(self.pista, d, d + timedelta(days=200))), 62)

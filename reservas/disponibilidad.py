@@ -51,10 +51,13 @@ def disponibilidad_por_dia(resource, desde, hasta):
     while dia < hasta:
         ini = timezone.make_aware(datetime.combine(dia, HORA_APERTURA), tz)
         fin = timezone.make_aware(datetime.combine(dia, HORA_CIERRE), tz)
+        if dia == hoy:
+            # Hoy solo cuentan las horas que aún no pasaron (si ya no queda ninguna, el día es "pasado").
+            ini = min(max(ini, timezone.now()), fin)
         total = int((fin - ini).total_seconds() // 60)
         min_bloqueados = _union_minutos(bloqueos, ini, fin)
         min_ocupados = _union_minutos(reservas + bloqueos, ini, fin)
-        if dia < hoy:
+        if dia < hoy or total <= 0:
             estado = "pasado"
         elif min_bloqueados >= total:
             estado = "bloqueado"
